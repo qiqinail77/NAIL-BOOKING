@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>美甲预约簿</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style>
+/* Layout: one narrow column like a phone appointment book; tomorrow's reminders pinned on top, bookings grouped by day */
+:root{
+  --bg:#f6f3f5; --surface:#ffffff; --fg:#2a2229; --muted:#7a6d77; --line:#e7dfe5;
+  --accent:#b23a6b; --accent-soft:#f6e3ec; --ok:#2f7d55; --ok-soft:#e2f2e9; --warn:#b5651d; --warn-soft:#fbeedd;
+  --chip:#efe9ee;
+  --f-display:"Outfit","Noto Sans SC",system-ui,sans-serif;
+  --f-body:"Noto Sans SC",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#1b161a; --surface:#251f24; --fg:#f1e9ef; --muted:#a7999f; --line:#3a3138;
+  --accent:#ee7aa8; --accent-soft:#43263a; --ok:#6fcf97; --ok-soft:#1f3a2b; --warn:#f0a861; --warn-soft:#3f2c18; --chip:#332a31; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1b161a; --surface:#251f24; --fg:#f1e9ef; --muted:#a7999f; --line:#3a3138;
+  --accent:#ee7aa8; --accent-soft:#43263a; --ok:#6fcf97; --ok-soft:#1f3a2b; --warn:#f0a861; --warn-soft:#3f2c18; --chip:#332a31; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+img{max-width:100%}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:720px;margin:0 auto;padding-block:20px 80px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--f-display);font-size:28px;margin:0;letter-spacing:.01em;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px}
+button,.btn{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:8px 14px;font-size:14px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+:root[data-theme="dark"] .primary{color:#1b161a}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .primary{color:#1b161a}}
+.ghost{background:transparent}
+.danger{color:#c0392b;border-color:currentColor;background:transparent}
+.remind{background:var(--warn-soft);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.remind h2{margin:0;font-size:15px;color:var(--warn);font-weight:700}
+.remind ul{margin:0;padding-left:18px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tab{border-radius:999px;padding:6px 14px;font-size:14px}
+.tab[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.search{flex:1;min-width:140px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:7px 14px;font:inherit;font-size:14px}
+.day{display:flex;flex-direction:column;gap:10px}
+.day h3{margin:6px 0 0;font-family:var(--f-display);font-size:16px;font-weight:600;display:flex;gap:8px;align-items:baseline}
+.day h3 small{color:var(--muted);font-family:var(--f-body);font-weight:400;font-size:13px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;grid-template-columns:64px 1fr;gap:4px 14px}
+.card.cancelled{opacity:.55}
+.time{font-family:var(--f-display);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--accent)}
+.body{min-width:0;display:flex;flex-direction:column;gap:6px}
+.top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.name{font-weight:700;font-size:16px}
+.pill{font-size:12px;border-radius:999px;padding:2px 9px;font-weight:500;white-space:nowrap}
+.dep-yes{background:var(--ok-soft);color:var(--ok)}
+.dep-no{background:var(--warn-soft);color:var(--warn)}
+.src{background:var(--chip);color:var(--muted)}
+.st{background:var(--chip);color:var(--muted)}
+.phone{font-variant-numeric:tabular-nums;color:var(--muted);font-size:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.phone button{padding:2px 8px;font-size:12px;border-radius:7px}
+.svc{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:14px}
+.svc small{color:var(--muted);font-size:12px;margin-right:5px}
+.notes{font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.photos{display:flex;gap:6px;flex-wrap:wrap}
+.photos img{width:72px;height:72px;object-fit:cover;border-radius:9px;border:1px solid var(--line);cursor:zoom-in;background:var(--chip)}
+.actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.actions button{padding:4px 10px;font-size:13px;border-radius:8px}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:14px;padding:24px;color:var(--muted);text-align:center}
+.status{color:var(--muted);font-size:13px}
+/* editor */
+.overlay{position:fixed;inset:0;background:rgba(20,10,18,.5);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;z-index:20;padding:calc(env(safe-area-inset-top,0px) + 24px) max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+.sheet{background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:520px;display:flex;flex-direction:column;gap:12px}
+.sheet h2{margin:0;font-family:var(--f-display);font-size:20px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:440px){.row{grid-template-columns:1fr}}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);min-width:0}
+input,select,textarea{font:inherit;font-size:15px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;width:100%}
+textarea{min-height:70px;resize:vertical}
+.check{flex-direction:row;align-items:center;gap:8px;color:var(--fg);font-size:15px}
+.check input{width:auto}
+.edphotos{display:flex;gap:8px;flex-wrap:wrap}
+.edphotos div{position:relative}
+.edphotos img{width:72px;height:72px;object-fit:cover;border-radius:9px}
+.edphotos button{position:absolute;top:-6px;right:-6px;padding:0 6px;border-radius:999px;font-size:12px}
+.sheet .foot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:30;padding:16px}
+.lightbox img{max-height:90vh;border-radius:10px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:8px 16px;border-radius:999px;font-size:14px;z-index:40}
+@media (prefers-reduced-motion:no-preference){.card{transition:border-color .15s}.card:hover{border-color:var(--accent)}}
+.login{max-width:360px;margin:12vh auto 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:12px}
+.login h1{text-align:center}
+.login .err{color:#c0392b;font-size:14px;min-height:1.2em}
+</style>
+</head>
+<body>
+
+<form class="login" id="login" hidden>
+  <h1>美甲预约簿</h1>
+  <label>邮箱<input id="l-email" type="email" autocomplete="username" required></label>
+  <label>密码<input id="l-pass" type="password" autocomplete="current-password" required></label>
+  <button class="primary" type="submit">登入</button>
+  <div class="err" id="l-err"></div>
+</form>
+
+<div class="wrap" id="app" hidden>
+  <header>
+    <div>
+      <h1>美甲预约簿</h1>
+      <div class="sub" id="today"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="ghost" id="icsAll">全部加到日历</button>
+      <button class="ghost" id="logout">登出</button>
+      <button class="primary" id="addBtn">+ 新预约</button>
+    </div>
+  </header>
+
+  <section class="remind" id="remind" hidden></section>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-view="upcoming" aria-selected="true">即将到来</button>
+    <button class="tab" role="tab" data-view="past" aria-selected="false">已过去</button>
+    <button class="tab" role="tab" data-view="all" aria-selected="false">全部</button>
+    <input class="search" id="q" type="search" placeholder="搜名字 / 电话 / 备注">
+  </div>
+
+  <div id="list"><div class="empty">正在读取预约…</div></div>
+</div>
+
+<div class="overlay" id="editor" hidden>
+  <form class="sheet" id="form">
+    <h2 id="edTitle">新预约</h2>
+    <label>客人名字<input id="f-name" required></label>
+    <label>手机号码<input id="f-phone" inputmode="tel"></label>
+    <div class="row">
+      <label>预约日期<input id="f-date" type="date" required></label>
+      <label>预约时间<input id="f-time" type="time" required></label>
+    </div>
+    <div class="row">
+      <label>客人来源
+        <select id="f-source"><option>IG</option><option>WhatsApp</option><option>其他</option></select>
+      </label>
+      <label>定金金额 (RM，可留空)<input id="f-amount" type="number" min="0" step="1"></label>
+    </div>
+    <div class="row">
+      <label>美甲项目<input id="f-service" placeholder="例如：单色、延长、卸甲"></label>
+      <label>款式<input id="f-style" placeholder="例如：猫眼法式"></label>
+    </div>
+    <label>价格 (RM)<input id="f-price" type="number" min="0" step="1"></label>
+    <label class="check"><input id="f-deposit" type="checkbox"> 已收定金</label>
+    <label>开始用网页之前来过几次（可留空）<input id="f-prev" type="number" min="0" step="1"></label>
+    <label>状态
+      <select id="f-status"><option value="booked">已预约</option><option value="done">已完成</option><option value="cancelled">已取消</option></select>
+    </label>
+    <label>备注<textarea id="f-notes" placeholder="款式、长度、卸甲等"></textarea></label>
+    <label>参考照片<input id="f-file" type="file" accept="image/*" multiple></label>
+    <div class="edphotos" id="edPhotos"></div>
+    <div class="foot">
+      <div><button type="button" class="danger" id="delBtn" hidden>删除</button></div>
+      <div style="display:flex;gap:8px">
+        <button type="button" id="cancelBtn">取消</button>
+        <button type="submit" class="primary" id="saveBtn">保存</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="lightbox" id="lightbox" hidden><img id="lbImg" alt="参考照片"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const WD = ['周日','周一','周二','周三','周四','周五','周六'];
+const pad = n => String(n).padStart(2,'0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const urlCache = {};
+const photoUrl = p => urlCache[p] || '';
+async function signPhotos(paths){
+  const need = [...new Set(paths)].filter(p => !urlCache[p]);
+  if (!need.length) return;
+  const { data } = await sb.storage.from('photos').createSignedUrls(need, 60*60*24);
+  (data||[]).forEach(x => { if (x.signedUrl) urlCache[x.path] = x.signedUrl; });
+}
+// DB columns are snake_case; the page uses camelCase
+const fromRow = r => ({ id:r.id, name:r.name, phone:r.phone, date:r.date, time:(r.time||'').slice(0,5), source:r.source,
+  deposit:r.deposit, depositAmount:r.deposit_amount, service:r.service, style:r.style, price:r.price,
+  status:r.status, notes:r.notes, prevVisits:r.prev_visits, photos:r.photos||[] });
+const toRow = b => ({ name:b.name, phone:b.phone, date:b.date, time:b.time, source:b.source, deposit:b.deposit,
+  deposit_amount:b.depositAmount, service:b.service, style:b.style, price:b.price, prev_visits:b.prevVisits, status:b.status,
+  notes:b.notes, photos:b.photos, updated_at:new Date().toISOString() });
+
+let sb = null, canWrite = true;
+let bookings = [], view = 'upcoming', editing = null, edPhotos = [];
+
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
+
+function dayLabel(dateStr){
+  const today = ymd(new Date());
+  const tm = new Date(); tm.setDate(tm.getDate()+1);
+  const d = new Date(dateStr+'T00:00:00');
+  const base = `${d.getMonth()+1}月${d.getDate()}日`;
+  const wd = WD[d.getDay()];
+  if (dateStr === today) return ['今天', `${base} ${wd}`];
+  if (dateStr === ymd(tm)) return ['明天', `${base} ${wd}`];
+  return [base, wd];
+}
+
+function render(){
+  const now = new Date(), today = ymd(now);
+  $('#today').textContent = `今天 ${now.getMonth()+1}月${now.getDate()}日 ${WD[now.getDay()]}`;
+  const tmDate = new Date(); tmDate.setDate(tmDate.getDate()+1);
+  const tomorrow = ymd(tmDate);
+
+  // reminder banner
+  const tmList = bookings.filter(b => b.date === tomorrow && b.status !== 'cancelled').sort(byTime);
+  const tdList = bookings.filter(b => b.date === today && b.status === 'booked').sort(byTime);
+  const r = $('#remind');
+  if (tmList.length || tdList.length){
+    let h = '';
+    if (tmList.length) h += `<h2>明天有 ${tmList.length} 个预约，记得提醒客人</h2><ul>${tmList.map(b=>`<li>${esc(b.time)} ${esc(b.name)}${b.phone?' · '+esc(b.phone):''}${b.deposit?'':' · <b>未收定金</b>'}</li>`).join('')}</ul>`;
+    if (tdList.length) h += `<h2 style="color:var(--accent)">今天还有 ${tdList.length} 个预约</h2><ul>${tdList.map(b=>`<li>${esc(b.time)} ${esc(b.name)}</li>`).join('')}</ul>`;
+    r.innerHTML = h; r.hidden = false;
+  } else r.hidden = true;
+
+  const q = $('#q').value.trim().toLowerCase();
+  let list = bookings.slice();
+  if (view === 'upcoming') list = list.filter(b => b.date >= today && b.status !== 'cancelled');
+  if (view === 'past') list = list.filter(b => b.date < today);
+  if (q) list = list.filter(b => [b.name,b.phone,b.notes,b.source,b.service,b.style].join(' ').toLowerCase().includes(q));
+  list.sort(byTime);
+  if (view === 'past') list.reverse();
+
+  const el = $('#list');
+  if (!list.length){
+    el.innerHTML = `<div class="empty">${bookings.length ? '这里没有符合的预约' : '还没有预约。把客人的预约信息和照片发给 Claude，或点“+ 新预约”自己加。'}</div>`;
+    return;
+  }
+  const groups = {};
+  list.forEach(b => (groups[b.date] ||= []).push(b));
+  el.innerHTML = Object.entries(groups).map(([date, items]) => {
+    const [a, b] = dayLabel(date);
+    return `<section class="day"><h3>${a} <small>${b} · ${items.length} 个</small></h3>${items.map(card).join('')}</section>`;
+  }).join('');
+}
+// visit count: same customer = same phone digits (or same name if no phone)
+const custKey = b => { const d = String(b.phone||'').replace(/\D/g,''); return d ? 'p'+d.replace(/^60/,'0') : 'n'+String(b.name||'').trim().toLowerCase(); };
+function visitInfo(b){
+  const mine = bookings.filter(x => custKey(x) === custKey(b) && x.status !== 'cancelled').sort(byTime);
+  const prev = Math.max(0, ...mine.map(x => Number(x.prevVisits)||0));
+  const idx = mine.findIndex(x => x.id === b.id);
+  return { nth: prev + (idx < 0 ? mine.length : idx + 1), done: prev + mine.filter(x => x.status === 'done').length };
+}
+function byTime(a,b){return (a.date+a.time).localeCompare(b.date+b.time)}
+function card(b){
+  const st = b.status === 'done' ? '<span class="pill st">已完成</span>' : b.status === 'cancelled' ? '<span class="pill st">已取消</span>' : '';
+  const dep = b.deposit ? `<span class="pill dep-yes">已收定金${b.depositAmount?' RM'+esc(b.depositAmount):''}</span>` : '<span class="pill dep-no">未收定金</span>';
+  const photos = (b.photos||[]).map(p => `<img src="${esc(photoUrl(p))}" alt="参考照片" loading="lazy" data-full="${esc(photoUrl(p))}">`).join('');
+  return `<article class="card ${b.status==='cancelled'?'cancelled':''}">
+    <div class="time">${esc(b.time)}</div>
+    <div class="body">
+      <div class="top"><span class="name">${esc(b.name)}</span>${dep}<span class="pill src">${esc(b.source||'其他')}</span>${st}${(()=>{const v=visitInfo(b);return `<span class="pill ${v.nth>1?'dep-yes':'src'}" title="已完成 ${v.done} 次">${v.nth>1?'第 '+v.nth+' 次来':'新客人'}</span>`})()}</div>
+      ${b.phone?`<div class="phone"><span>${esc(b.phone)}</span><button data-copy="${esc(b.phone)}">复制</button></div>`:''}
+      ${(b.service||b.style||b.price!=null)?`<div class="svc">${[b.service&&`<span><small>项目</small>${esc(b.service)}</span>`, b.style&&`<span><small>款式</small>${esc(b.style)}</span>`, b.price!=null&&b.price!==''&&`<span><small>价格</small>RM${esc(b.price)}</span>`].filter(Boolean).join('')}</div>`:''}
+      ${b.notes?`<div class="notes">${esc(b.notes)}</div>`:''}
+      ${photos?`<div class="photos">${photos}</div>`:''}
+      <div class="actions">
+        <button data-ics="${esc(b.id)}">加到日历（前一天提醒）</button>
+        ${canWrite?`<button data-edit="${esc(b.id)}">编辑</button>`:''}
+      </div>
+    </div>
+  </article>`;
+}
+
+// ---- calendar (.ics) ----
+function icsTime(date, time){ // Malaysia is UTC+8 all year
+  const [y,m,d] = date.split('-').map(Number), [hh,mm] = (time||'10:00').split(':').map(Number);
+  const t = new Date(Date.UTC(y,m-1,d,hh-8,mm));
+  return t.toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
+}
+const icsEsc = s => String(s??'').replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');
+function vevent(b){
+  const start = icsTime(b.date,b.time);
+  const [y,m,d] = b.date.split('-').map(Number), [hh,mm] = (b.time||'10:00').split(':').map(Number);
+  const end = new Date(Date.UTC(y,m-1,d,hh-8+2,mm)).toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
+  const desc = [`电话: ${b.phone||'-'}`, `定金: ${b.deposit?'已收'+(b.depositAmount?' RM'+b.depositAmount:''):'未收'}`, `来源: ${b.source||'-'}`, b.service?`项目: ${b.service}`:'', b.style?`款式: ${b.style}`:'', b.price!=null?`价格: RM${b.price}`:'', b.notes?`备注: ${b.notes}`:''].filter(Boolean).join('\n');
+  return ['BEGIN:VEVENT',`UID:${b.id}@nail-booking`,`DTSTAMP:${icsTime(ymd(new Date()),'08:00')}`,`DTSTART:${start}`,`DTEND:${end}`,
+    `SUMMARY:${icsEsc('美甲预约 · '+b.name)}`,`DESCRIPTION:${icsEsc(desc)}`,
+    'BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:${icsEsc('明天 '+b.time+' '+b.name+' 美甲预约')}`,'TRIGGER:-P1D','END:VALARM',
+    'BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:${icsEsc('2小时后 '+b.name+' 美甲预约')}`,'TRIGGER:-PT2H','END:VALARM',
+    'END:VEVENT'].join('\r\n');
+}
+async function saveIcs(list, filename){
+  const text = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//nail-booking//CN','CALSCALE:GREGORIAN',...list.map(vevent),'END:VCALENDAR'].join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text],{type:'text/calendar'}));
+  a.download = filename; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+// ---- editor ----
+function openEditor(b){
+  editing = b || null;
+  $('#edTitle').textContent = b ? '编辑预约' : '新预约';
+  $('#f-name').value = b?.name || '';
+  $('#f-phone').value = b?.phone || '';
+  $('#f-date').value = b?.date || ymd(new Date());
+  $('#f-time').value = b?.time || '';
+  $('#f-source').value = b?.source || 'IG';
+  $('#f-amount').value = b?.depositAmount ?? '';
+  $('#f-deposit').checked = !!b?.deposit;
+  $('#f-service').value = b?.service || '';
+  $('#f-style').value = b?.style || '';
+  $('#f-price').value = b?.price ?? '';
+  $('#f-prev').value = b?.prevVisits ?? '';
+  $('#f-status').value = b?.status || 'booked';
+  $('#f-notes').value = b?.notes || '';
+  $('#f-file').value = '';
+  edPhotos = (b?.photos || []).slice();
+  drawEdPhotos();
+  $('#delBtn').hidden = !b; $('#delBtn').textContent = '删除'; $('#delBtn').dataset.armed = '';
+  $('#editor').hidden = false;
+}
+function drawEdPhotos(){
+  $('#edPhotos').innerHTML = edPhotos.map((p,i)=>`<div><img src="${esc(photoUrl(p))}" alt=""><button type="button" data-rm="${i}" aria-label="移除照片">×</button></div>`).join('');
+}
+$('#edPhotos').addEventListener('click', e => { const i = e.target.dataset.rm; if (i!=null){ edPhotos.splice(+i,1); drawEdPhotos(); } });
+$('#f-file').addEventListener('change', async e => {
+  const files = [...e.target.files]; if (!files.length) return;
+  $('#saveBtn').disabled = true; toast('正在上传照片…');
+  for (const f of files){
+    try {
+      const ext = (f.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
+      const path = `${Date.now()}-${Math.random().toString(36).slice(2,7)}.${ext}`;
+      const { error } = await sb.storage.from('photos').upload(path, f, { contentType: f.type || 'image/jpeg' });
+      if (error) throw error;
+      await signPhotos([path]); edPhotos.push(path); drawEdPhotos();
+    }
+    catch(err){ toast('有一张照片上传失败：' + (err?.message || err?.code || '')); }
+  }
+  $('#saveBtn').disabled = false; e.target.value = '';
+});
+$('#cancelBtn').onclick = () => $('#editor').hidden = true;
+$('#delBtn').onclick = async () => {
+  const btn = $('#delBtn');
+  if (!btn.dataset.armed){ btn.dataset.armed = '1'; btn.textContent = '再按一次确认删除'; return; }
+  try {
+    const { error } = await sb.from('bookings').delete().eq('id', editing.id); if (error) throw error;
+    if (editing.photos?.length) await sb.storage.from('photos').remove(editing.photos);
+    $('#editor').hidden = true; toast('已删除'); load();
+  }
+  catch(e){ toast('删除失败'); }
+};
+$('#form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const amt = $('#f-amount').value;
+  const data = {
+    name: $('#f-name').value.trim(), phone: $('#f-phone').value.trim(),
+    date: $('#f-date').value, time: $('#f-time').value,
+    source: $('#f-source').value, deposit: $('#f-deposit').checked,
+    depositAmount: amt === '' ? null : Number(amt),
+    service: $('#f-service').value.trim(), style: $('#f-style').value.trim(),
+    price: $('#f-price').value === '' ? null : Number($('#f-price').value),
+    prevVisits: $('#f-prev').value === '' ? null : Number($('#f-prev').value),
+    status: $('#f-status').value, notes: $('#f-notes').value.trim(),
+    photos: edPhotos, updatedAt: new Date().toISOString()
+  };
+  try {
+    let res;
+    if (editing) res = await sb.from('bookings').update(toRow(data)).eq('id', editing.id);
+    else {
+      const id = `${data.date.replace(/-/g,'')}-${data.time.replace(':','')}-${Math.random().toString(36).slice(2,7)}`;
+      res = await sb.from('bookings').insert({ id, ...toRow(data) });
+    }
+    if (res.error) throw res.error;
+    $('#editor').hidden = true; toast('已保存'); load();
+  } catch(err){ toast('保存失败：' + (err?.message || '')); }
+});
+
+// ---- events ----
+document.querySelector('.tabs').addEventListener('click', e => {
+  const v = e.target.dataset.view; if (!v) return;
+  view = v; document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.view===v));
+  render();
+});
+$('#q').addEventListener('input', render);
+$('#list').addEventListener('click', async e => {
+  const t = e.target;
+  if (t.dataset.full){ $('#lbImg').src = t.dataset.full; $('#lightbox').hidden = false; }
+  if (t.dataset.copy){ try { await navigator.clipboard.writeText(t.dataset.copy); toast('已复制电话'); } catch { toast(t.dataset.copy); } }
+  if (t.dataset.edit) openEditor(bookings.find(b => b.id === t.dataset.edit));
+  if (t.dataset.ics){ const b = bookings.find(x => x.id === t.dataset.ics); saveIcs([b], `预约-${b.name}-${b.date}.ics`); }
+});
+$('#lightbox').onclick = () => $('#lightbox').hidden = true;
+$('#addBtn').onclick = () => openEditor(null);
+$('#icsAll').onclick = () => {
+  const today = ymd(new Date());
+  const list = bookings.filter(b => b.date >= today && b.status === 'booked');
+  if (!list.length) return toast('没有即将到来的预约');
+  saveIcs(list, `美甲预约-${today}.ics`);
+};
+
+// ---- boot ----
+async function load(){
+  const { data, error } = await sb.from('bookings').select('*');
+  if (error){ $('#list').innerHTML = `<div class="empty">读取预约出错：${esc(error.message)}</div>`; return; }
+  bookings = data.map(fromRow);
+  render();
+  await signPhotos(bookings.flatMap(b => b.photos));
+  render();
+}
+async function showApp(){
+  $('#login').hidden = true; $('#app').hidden = false;
+  await load();
+}
+(async () => {
+  const cfg = window.NAIL_CONFIG || {};
+  if (!window.supabase || !cfg.supabaseUrl){ document.body.innerHTML = '<p style="padding:24px">网站设置还没完成（缺少 config.js）。</p>'; return; }
+  sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+  $('#login').addEventListener('submit', async e => {
+    e.preventDefault(); $('#l-err').textContent = '';
+    const { error } = await sb.auth.signInWithPassword({ email: $('#l-email').value.trim(), password: $('#l-pass').value });
+    if (error) $('#l-err').textContent = '邮箱或密码不对，请再试一次。'; else showApp();
+  });
+  $('#logout').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+  const { data:{ session } } = await sb.auth.getSession();
+  if (session) showApp(); else $('#login').hidden = false;
+  // keep the list fresh: reload when the page comes back to the front, and re-render every 10 min so 今天/明天 stay right
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('#app').hidden) load(); });
+  setInterval(() => { if (!$('#app').hidden) load(); }, 10*60*1000);
+})();
+</script>
+</body>
+</html>
