@@ -85,6 +85,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .photos{display:flex;gap:6px;flex-wrap:wrap}
 .photos img{width:72px;height:72px;object-fit:cover;border-radius:9px;border:1px solid var(--line);cursor:zoom-in;background:var(--chip)}
 .actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.actions .btn{padding:4px 10px;font-size:13px;border-radius:8px;text-decoration:none;display:inline-flex;align-items:center}
 .actions button{padding:4px 10px;font-size:13px;border-radius:8px}
 .empty{background:var(--surface);border:1px dashed var(--line);border-radius:14px;padding:24px;color:var(--muted);text-align:center}
 .status{color:var(--muted);font-size:13px}
@@ -319,7 +320,8 @@ function card(b){
       ${b.notes?`<div class="notes">${esc(b.notes)}</div>`:''}
       ${photos?`<div class="photos">${photos}</div>`:''}
       <div class="actions">
-        <button data-ics="${esc(b.id)}">加到日历（前一天提醒）</button>
+        <a class="btn gcal" href="${esc(gcalUrl(b))}" target="_blank" rel="noopener">加到 Google 日历</a>
+        <button data-ics="${esc(b.id)}">下载日历文件</button>
         ${canWrite?`<button data-edit="${esc(b.id)}">编辑</button>`:''}
       </div>
     </div>
@@ -333,6 +335,14 @@ function icsTime(date, time){ // Malaysia is UTC+8 all year
   return t.toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
 }
 const icsEsc = s => String(s??'').replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');
+function gcalUrl(b){
+  const [y,m,d] = b.date.split('-').map(Number), [hh,mm] = (b.time||'10:00').split(':').map(Number);
+  const f = t => t.toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
+  const start = new Date(Date.UTC(y,m-1,d,hh-8,mm)), end = new Date(start.getTime() + 2*3600e3);
+  const details = [`电话: ${b.phone||'-'}`, `定金: ${b.deposit?'已收'+(b.depositAmount?' RM'+b.depositAmount:''):'未收'}`, `来源: ${b.source||'-'}`,
+    b.service?`项目: ${b.service}`:'', b.style?`款式: ${b.style}`:'', b.price!=null?`价格: RM${b.price}`:'', b.notes?`备注: ${b.notes}`:''].filter(Boolean).join('\n');
+  return 'https://calendar.google.com/calendar/render?' + new URLSearchParams({action:'TEMPLATE', text:'美甲预约 · '+b.name, dates:f(start)+'/'+f(end), details, ctz:'Asia/Kuala_Lumpur'});
+}
 function vevent(b){
   const start = icsTime(b.date,b.time);
   const [y,m,d] = b.date.split('-').map(Number), [hh,mm] = (b.time||'10:00').split(':').map(Number);
