@@ -99,8 +99,9 @@ textarea{min-height:70px;resize:vertical}
 
 <form class="login" id="login" hidden>
   <h1>美甲预约簿</h1>
-  <label>邮箱<input id="l-email" type="email" autocomplete="username" required></label>
+  <label>邮箱<input id="l-email" type="email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
   <label>密码<input id="l-pass" type="password" autocomplete="current-password" required></label>
+  <label class="check"><input id="l-show" type="checkbox"> 显示密码</label>
   <button class="primary" type="submit">登入</button>
   <div class="err" id="l-err"></div>
 </form>
@@ -423,9 +424,10 @@ async function showApp(){
   sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
   $('#login').addEventListener('submit', async e => {
     e.preventDefault(); $('#l-err').textContent = '';
-    const { error } = await sb.auth.signInWithPassword({ email: $('#l-email').value.trim(), password: $('#l-pass').value });
-    if (error) $('#l-err').textContent = '邮箱或密码不对，请再试一次。'; else showApp();
+    const { error } = await sb.auth.signInWithPassword({ email: $('#l-email').value.trim().toLowerCase(), password: $('#l-pass').value });
+    if (error) $('#l-err').textContent = error.code === 'invalid_credentials' || /Invalid login/.test(error.message) ? '邮箱或密码不对，请再试一次。注意大小写和前后空格。' : '登入失败：' + error.message; else showApp();
   });
+  $('#l-show').onchange = e => { $('#l-pass').type = e.target.checked ? 'text' : 'password'; };
   $('#logout').onclick = async () => { await sb.auth.signOut(); location.reload(); };
   const { data:{ session } } = await sb.auth.getSession();
   if (session) showApp(); else $('#login').hidden = false;
