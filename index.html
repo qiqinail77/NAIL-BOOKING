@@ -64,6 +64,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .svc{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:14px}
 .svc small{color:var(--muted);font-size:12px;margin-right:5px}
 .cal{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.clear-day{margin-left:auto;font-size:13px;padding:4px 10px}
 .cal-head{display:flex;align-items:center;gap:8px}
 .cal-head strong{font-family:var(--f-display);font-size:18px;flex:1;text-align:center;order:0}
 .cal-head button{padding:4px 12px;font-size:16px}
@@ -138,9 +139,10 @@ textarea{min-height:70px;resize:vertical}
 
   <section class="remind" id="remind" hidden></section>
 
+  <div id="cal"></div>
+
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" data-view="upcoming" aria-selected="true">即将到来</button>
-    <button class="tab" role="tab" data-view="calendar" aria-selected="false">日历</button>
     <button class="tab" role="tab" data-view="past" aria-selected="false">已过去</button>
     <button class="tab" role="tab" data-view="all" aria-selected="false">全部</button>
     <input class="search" id="q" type="search" placeholder="搜名字 / 电话 / 备注">
@@ -246,16 +248,23 @@ function render(){
     r.innerHTML = h; r.hidden = false;
   } else r.hidden = true;
 
-  if (view === 'calendar') return renderCalendar();
+  renderCalendar();
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', !calSel && t.dataset.view===view));
   const q = $('#q').value.trim().toLowerCase();
   let list = bookings.slice();
-  if (view === 'upcoming') list = list.filter(b => b.date >= today && b.status !== 'cancelled');
-  if (view === 'past') list = list.filter(b => b.date < today);
+  if (calSel) list = list.filter(b => b.date === calSel);
+  else if (view === 'upcoming') list = list.filter(b => b.date >= today && b.status !== 'cancelled');
+  else if (view === 'past') list = list.filter(b => b.date < today);
   if (q) list = list.filter(b => [b.name,b.phone,b.notes,b.source,b.service,b.style].join(' ').toLowerCase().includes(q));
   list.sort(byTime);
   if (view === 'past') list.reverse();
 
   const el = $('#list');
+  if (calSel){
+    const [a, b] = dayLabel(calSel);
+    el.innerHTML = `<section class="day"><h3>${a} <small>${b} · ${list.length} 个</small><button class="ghost clear-day" data-clear="1">显示全部预约</button></h3>${list.length ? list.map(card).join('') : '<div class="empty">这天没有预约</div>'}</section>`;
+    return;
+  }
   if (!list.length){
     el.innerHTML = `<div class="empty">${bookings.length ? '这里没有符合的预约' : '还没有预约。把客人的预约信息和照片发给 Claude，或点“+ 新预约”自己加。'}</div>`;
     return;
@@ -269,7 +278,7 @@ function render(){
 }
 // ---- month calendar ----
 let calMonth = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })();
-let calSel = ymd(new Date());
+let calSel = null;
 function renderCalendar(){
   const today = ymd(new Date());
   const y = calMonth.getFullYear(), m = calMonth.getMonth();
@@ -283,13 +292,10 @@ function renderCalendar(){
     const cls = ['cal-cell', ds===today?'is-today':'', ds===calSel?'is-sel':'', items.length?'has':'' , ds<today?'is-past':''].join(' ');
     cells += `<button class="${cls}" data-day="${ds}"><span class="cal-d">${d}</span>${items.slice(0,2).map(b=>`<span class="cal-ev">${esc(b.time)} ${esc(b.name)}</span>`).join('')}${items.length>2?`<span class="cal-more">+${items.length-2}</span>`:''}${items.length?`<span class="cal-dot">${items.length}</span>`:''}</button>`;
   }
-  const sel = (bookings.filter(b => b.date === calSel)).sort(byTime);
-  const [a, b] = dayLabel(calSel);
-  $('#list').innerHTML = `<div class="cal">
+  $('#cal').innerHTML = `<div class="cal">
     <div class="cal-head"><button data-mon="-1" aria-label="上个月">‹</button><strong>${y}年${m+1}月</strong><button data-mon="1" aria-label="下个月">›</button><button data-mon="0" class="ghost">今天</button></div>
     <div class="cal-grid">${['日','一','二','三','四','五','六'].map(w=>`<div class="cal-wd">${w}</div>`).join('')}${cells}</div>
-  </div>
-  <section class="day"><h3>${a} <small>${b} · ${sel.length} 个</small></h3>${sel.length ? sel.map(card).join('') : '<div class="empty">这天没有预约</div>'}</section>`;
+  </div>`;
 }
 // visit count: same customer = same phone digits (or same name if no phone)
 const custKey = b => { const d = String(b.phone||'').replace(/\D/g,''); return d ? 'p'+d.replace(/^60/,'0') : 'n'+String(b.name||'').trim().toLowerCase(); };
@@ -428,15 +434,19 @@ $('#form').addEventListener('submit', async e => {
 // ---- events ----
 document.querySelector('.tabs').addEventListener('click', e => {
   const v = e.target.dataset.view; if (!v) return;
-  view = v; document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.view===v));
+  view = v; calSel = null; document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.view===v));
   render();
 });
-$('#q').addEventListener('input', render);
+$('#q').addEventListener('input', () => { calSel = null; render(); });
+$('#cal').addEventListener('click', e => {
+  const day = e.target.closest('[data-day]');
+  if (day){ calSel = calSel === day.dataset.day ? null : day.dataset.day; render(); if (calSel) $('#list').scrollIntoView({behavior:'smooth', block:'start'}); return; }
+  const mon = e.target.closest('[data-mon]');
+  if (mon){ const n = +mon.dataset.mon; if (n === 0){ const d = new Date(); calMonth = new Date(d.getFullYear(), d.getMonth(), 1); } else calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth()+n, 1); render(); }
+});
 $('#list').addEventListener('click', async e => {
   const t = e.target;
-  const day = t.closest('[data-day]'); if (day){ calSel = day.dataset.day; render(); return; }
-  const mon = t.closest('[data-mon]');
-  if (mon){ const n = +mon.dataset.mon; if (n === 0){ const d = new Date(); calMonth = new Date(d.getFullYear(), d.getMonth(), 1); calSel = ymd(d); } else calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth()+n, 1); render(); return; }
+  if (t.dataset.clear){ calSel = null; render(); return; }
   if (t.dataset.full){ $('#lbImg').src = t.dataset.full; $('#lightbox').hidden = false; }
   if (t.dataset.copy){ try { await navigator.clipboard.writeText(t.dataset.copy); toast('已复制电话'); } catch { toast(t.dataset.copy); } }
   if (t.dataset.edit) openEditor(bookings.find(b => b.id === t.dataset.edit));
